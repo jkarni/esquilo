@@ -2,6 +2,7 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE OverlappingInstances #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE PolyKinds #-}
@@ -16,8 +17,10 @@ import GHC.TypeLits
 import Database.PostgreSQL.Simple
 import Database.PostgreSQL.Simple.FromField hiding (Field)
 
+data (a :: Symbol) :|: (b :: Symbol)
+
 class Select a where
-    type SelectT a
+    type SelectT a :: k
     select :: Proxy a -> Connection -> IO [SelectT a]
 
 instance ( KnownSymbol x, KnownSymbol tbl, Field x tbl ~ r, FromField r
@@ -28,9 +31,17 @@ instance ( KnownSymbol x, KnownSymbol tbl, Field x tbl ~ r, FromField r
         x   = fromString $ symbolVal (Proxy :: Proxy x)
         tbl = fromString $ symbolVal (Proxy :: Proxy tbl)
 
-{-instance ( Select (SELECT xs FROM tbl), KnownSymbol x, KnownSymbol tbl-}
-        {-) => Select (SELECT (x ': xs) FROM tbl) where-}
-    {-type SelectT (SELECT (x ': xs) FROM tbl) = Field x tbl ': (SelectT xs tbl)-}
+instance ( KnownSymbol x, KnownSymbol y, KnownSymbol tbl, Field x tbl ~ r
+         , Field y tbl ~ r', FromRow (r, r')
+        ) => Select (SELECT (x :|: y) FROM tbl) where
+    type SelectT (SELECT (x :|: y) FROM tbl) = (Field x tbl, Field y tbl)
+    select _ = \conn -> query_ conn q
+      where
+        q   = "SELECT " <> x <> ", " <> y <> " FROM " <> tbl
+        x   = fromString $ symbolVal (Proxy :: Proxy x)
+        y   = fromString $ symbolVal (Proxy :: Proxy y)
+        tbl = fromString $ symbolVal (Proxy :: Proxy tbl)
+
 
 type family Field (f :: Symbol) (tbl :: Symbol)
 
