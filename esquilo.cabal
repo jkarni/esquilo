@@ -21,6 +21,7 @@ library
                      , Esquilo.Main
   -- other-modules:
   -- other-extensions:
+  default-extensions:  TypeOperators, NoMonomorphismRestriction
   build-depends:       base >=4.6 && <5
                      , postgresql-simple
   hs-source-dirs:      src
